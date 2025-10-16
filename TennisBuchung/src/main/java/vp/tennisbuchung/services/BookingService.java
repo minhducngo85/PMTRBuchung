@@ -2,6 +2,8 @@ package vp.tennisbuchung.services;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.logging.log4j.util.Strings;
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -259,7 +261,7 @@ public class BookingService {
 	    LocalTime targetTime = LocalTime.of(uhrzeit.getHour(), uhrzeit.getMinute(), 0);
 
 	    delay = now.until(targetTime, ChronoUnit.MILLIS) - offsetMillis;
-	    log.info("scheduleClick ... delay = " + delay / 1000 / 60 + " minutes");
+	    log.info("scheduleClick ... delay = " + delay / 1000 + " seconds");
 	    if (delay <= 0) {
 		delay = 0;
 	    }
@@ -268,18 +270,25 @@ public class BookingService {
 	ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 	scheduler.schedule(() -> {
 	    String alertMsg = "";
-	    if (KontoName != null && !KontoName.isBlank()) {
+	    if (Strings.isNotEmpty(KontoName)) {
 		alertMsg = KontoName + ": ";
 	    }
 	    try {
 		buchen.click();
-		log.info("Buchen-button clicked!");
-		// Wait until alert text gets undated
+		if (Strings.isNotEmpty(KontoName)) {
+		    String clickInfo = KontoName + ": \"Buchen\" button clicked!";
+		    log.info(clickInfo);
+		    BuchungTelegramBot.addMessageToQueue(chatId, clickInfo);
+		}
+		
+		// Wait until alert text gets updated
 		try {
 		    Thread.sleep(2 * 1000);
 		} catch (InterruptedException e) {
 		    e.printStackTrace();
 		}
+		
+		// Collecting all alert messages and add them to the telegram message queue.
 		List<String> alertElements = new ArrayList<String>();
 		alertElements.add(
 			"/html/body/div[4]/div[2]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/p");
@@ -289,16 +298,14 @@ public class BookingService {
 			"/html/body/div[4]/div[3]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
 		alertElements.add(
 			"/html/body/div[4]/div[2]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
-
 		for (String alertXPath : alertElements) {
 		    try {
 			WebElement pElement = driver.findElement(By.xpath(alertXPath));
 			alertMsg += pElement.getText() + "\n";
 		    } catch (NoSuchElementException e) {
-			log.error("Element: " + alertXPath + " not found!");
+			log.error("Element not found: " + alertXPath);
 		    }
 		}
-
 		if (!alertMsg.isEmpty()) {
 		    log.info(alertMsg);
 		    BuchungTelegramBot.addMessageToQueue(chatId, alertMsg);
