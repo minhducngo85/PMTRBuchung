@@ -1,10 +1,14 @@
 package vp.tennisbuchung.telegram;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -23,6 +27,7 @@ import vp.tennisbuchung.enums.Uhrzeit;
 import static vp.tennisbuchung.enums.Dauer.ZWEI_STUNDE;
 import static vp.tennisbuchung.enums.Tage.*;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -81,7 +86,6 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    String heuteOrMorgen = splited[2];
 		    String uhrZeitStr = splited[3];
 
-		    sendMessage(chatId, "Scheduling booking now....");
 		    Konto konto = konto1;
 		    Tage tage = HEUTE;
 		    Uhrzeit uhrzeit = Uhrzeit.getUhrZeit(uhrZeitStr);
@@ -109,9 +113,10 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 			if (halleString.equalsIgnoreCase("M"))
 			    halle = Halle.MUELHEIM;
 		    }
-		    String msg = "Konto: " + konto.lastname();
-		    msg += "\nDatum: " + tage.getName();
-		    msg += "\nUhrzeit: " + uhrzeit.getStringValue();
+
+		    String msg = konto.lastname() + ": Scheduling booking now...";
+		    msg += "\nKonto: " + konto.lastname();
+		    msg += "\nZeitpunkt: " + tage.getName() + " " + uhrzeit.getStringValue();
 		    msg += "\nPlatz: " + platzNumber;
 		    msg += "\nHalle: " + halle.getName();
 		    log.info(msg);
@@ -120,6 +125,30 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 			    chatId);
 		    sendMessage(chatId, msg);
 
+		} else if (text.toLowerCase().startsWith("/getbookingstatus")
+			|| text.toLowerCase().startsWith("/getstatus")) {
+		    String[] splited = text.split(" ");
+		    Tage tage = HEUTE;
+		    Halle halle = Halle.DUISBURG;
+		    if (splited.length < 2) {
+			sendMessage(chatId, "Invalid command");
+			return;
+		    }
+		    String heuteOrMorgen = splited[1];
+		    if (heuteOrMorgen.equalsIgnoreCase("Morgen")) {
+			tage = Tage.MORGEN;
+		    }
+
+		    if (splited.length > 2) {
+			String halleString = splited[2];
+			if (halleString.equalsIgnoreCase("M"))
+			    halle = Halle.MUELHEIM;
+		    }
+		    String msg = "Fetching booking status";
+		    msg += "\nDatum: " + tage.getName();
+		    msg += "\nHalle: " + halle.getName();
+		    sendMessage(chatId, msg);
+		    bookingService.openChromeAndGetStatus(tage, halle, konto1, chatId);
 		} else if (text.equalsIgnoreCase("/cancelBooking")) {
 		    String msg = "To delete all pending booking jobs";
 		    sendMessage(chatId, msg);
@@ -134,18 +163,18 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    // sendMessage(chatId, msg);
 		    sendMessage(chatId, "Not supported command!");
 		} else if (text.startsWith("/help")) {
-		    String msg = "1. to book a tennis court\n/book [Konto] [Datum] [UhrZeit] [Platz] [Halle]\n\n";
-		    msg += "Konto: Ngo|Pham|Nguyen\n";
-		    msg += "Datum: Heute|Morgen\n";
-		    msg += "Uhrzeit (HH:mm): 9:00|21:00|21:30\n";
-		    msg += "Platz: 1|2|3\n";
-		    msg += "Halle(optional): D|M\n";
-		    msg += "D=Duisburg(default);M=Mülheim\n";
+		    String msg = "1. to book a tennis court\n/book [Konto] [Datum] [UhrZeit] [Platz] [Halle]\n";
+		    msg += "[Konto]: Ngo|Pham|Nguyen\n";
+		    msg += "[Datum]: Heute|Morgen\n";
+		    msg += "[Uhrzeit]: HH:mm e.g. 9:00|21:00|21:30\n";
+		    msg += "[Platz]: 1|2|3\n";
+		    msg += "[Halle](optional): D(default)|M\n";
 		    msg += "e.g. \n/book Ngo Heute 21:00 1\n";
 		    msg += "/book Ngo Heute 21:00 1 M";
-		    msg += "\n\n2. to cancel and deleted all pending bookings.\n /cancelBooking\n";
-		    // msg += "\n\n3.to retsart application.\n /restart\n";
-
+		    msg += "\n\n2. to cancel and deleted all pending bookings.\n /cancelBooking";
+		    msg += "\n\n3. to get booking status of a mall.\n /getStatus [Datum] [Halle:optional]\n";
+		    msg += "[Datum]: Heute|Morgen\n";
+		    msg += "[Halle]: D(default)|M\n";
 		    sendMessage(chatId, msg);
 		}
 	    }
@@ -172,14 +201,38 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 	}
     }
 
-    @Scheduled(cron = "0/1 * * ? * *")
+    /**
+     * to send a photo
+     * 
+     * @param chatId
+     * @param filePath
+     */
+    public void sendPhoto(Long chatId, String filePath) {
+	log.info("sendPhoto for filePath: " + filePath);
+	try {
+	    execute(SendPhoto.builder().chatId(chatId).photo(new InputFile(new java.io.File(filePath))).build());
+	    File fileToDelete = FileUtils.getFile(filePath);
+	    FileUtils.deleteQuietly(fileToDelete);
+	} catch (TelegramApiException e) {
+	    e.printStackTrace();
+	}
+    }
+
+    @Scheduled(cron = "0/2 * * ? * *")
     public void sendMessageFromQueue() {
 	if (!alrts.isEmpty()) {
 	    Iterator<TelegramMessage> it = alrts.iterator();
 	    alrts = new ArrayList<TelegramMessage>();
 	    while (it.hasNext()) {
 		TelegramMessage msg = it.next();
-		sendMessage(msg.getChatId(), msg.getMessage());
+		if (!StringUtils.isEmpty(msg.getMessage()) && msg.getMessage().startsWith("image:")) {
+		    String filePath = msg.getMessage().substring(6, msg.getMessage().length());
+
+		    sendPhoto(msg.getChatId(), filePath);
+		} else {
+		    sendMessage(msg.getChatId(), msg.getMessage());
+		}
+
 	    }
 	}
     }

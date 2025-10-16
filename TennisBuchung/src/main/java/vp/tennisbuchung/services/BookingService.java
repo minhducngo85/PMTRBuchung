@@ -3,10 +3,12 @@ package vp.tennisbuchung.services;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import vp.tennisbuchung.enums.Tage;
 import vp.tennisbuchung.enums.Uhrzeit;
 import vp.tennisbuchung.telegram.BuchungTelegramBot;
 
+import java.io.File;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -71,7 +74,7 @@ public class BookingService {
 	if (delay <= 0) {
 	    new Thread(earlyTask).start();
 	    new Thread(exactTask).start();
-	    ret = "Booking is running...!";
+	    ret = konto.lastname() + ": Booking is running...!";
 	} else {
 	    ScheduledFuture<?> earlyFuture = bookingScheduler.schedule(() -> new Thread(earlyTask).start(), delay,
 		    TimeUnit.MILLISECONDS);
@@ -79,7 +82,7 @@ public class BookingService {
 		    TimeUnit.MILLISECONDS);
 	    futures.add(earlyFuture);
 	    futures.add(exactFuture);
-	    ret = "Booking will be started in " + convertSecondsToString(delay / 1000);
+	    ret = konto.lastname() + ": Booking will be started in " + convertSecondsToString(delay / 1000);
 	}
 	return ret;
     }
@@ -108,12 +111,7 @@ public class BookingService {
 	return timeString;
     }
 
-    /**
-     * Mở Chrome riêng và book
-     */
-    private void openChromeAndBook(Tage tage, Uhrzeit uhrzeit, Halle halle, int platz, Dauer dauer, Konto konto,
-	    Long chatId) {
-	BuchungTelegramBot.addMessageToQueue(chatId, "Opening webbrowser for account: " + konto.lastname());
+    private WebDriver initializeWebDriver(int windowLength) {
 	ChromeOptions options = new ChromeOptions();
 	options.addArguments("--start-maximized");
 	options.addArguments("--disable-notifications");
@@ -127,8 +125,48 @@ public class BookingService {
 
 	WebDriver driver = new ChromeDriver(options);
 	driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10));
-	driver.manage().window().setSize(new Dimension(550, 900));
+	driver.manage().window().setSize(new Dimension(550, windowLength));
+	return driver;
+    }
 
+    // Get booking status of a given halle
+    public void openChromeAndGetStatus(Tage tage, Halle halle, Konto konto, Long chatId) {
+	BuchungTelegramBot.addMessageToQueue(chatId, konto.lastname() + ": Opening webbrowser ...");
+
+	WebDriver driver = initializeWebDriver(1100);
+	try {
+	    driver.get("https://app.tennis04.com/de/pmtr/login?returnUrl=%2Fde%2Fpmtr%2Fbuchungsplan");
+
+	    login(driver, konto);
+	    Thread.sleep(2000);
+
+	    selectHalle(driver, halle);
+	    Thread.sleep(1000);
+
+	    selectDay(driver, tage);
+	    Thread.sleep(1000);
+
+	    String fileName = "Screenshot_" + System.currentTimeMillis() + ".png";
+	    fileName = "C:/tmp/telegrambot/" + fileName;
+	    File src = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
+	    FileUtils.copyFile(src, new File(fileName));
+	    BuchungTelegramBot.addMessageToQueue(chatId, "image:" + fileName);
+	    Thread.sleep(10000);
+	} catch (Exception e) {
+	    log.error("An error occurs while fetching status", e);
+	} finally {
+	    log.info("Fetching status done!");
+	}
+    }
+
+    /**
+     * Mở Chrome riêng và book
+     */
+    private void openChromeAndBook(Tage tage, Uhrzeit uhrzeit, Halle halle, int platz, Dauer dauer, Konto konto,
+	    Long chatId) {
+	BuchungTelegramBot.addMessageToQueue(chatId, konto.lastname() + ": Opening webbrowser ...");
+
+	WebDriver driver = initializeWebDriver(900);
 	try {
 	    driver.get("https://app.tennis04.com/de/pmtr/login?returnUrl=%2Fde%2Fpmtr%2Fbuchungsplan");
 
@@ -151,6 +189,7 @@ public class BookingService {
 	    log.error("An error occurs while processing tennis buchen", e);
 	} finally {
 	    log.info("Buchen prepared successfully. Please check all opened windows to see results");
+	    driver.close();
 	}
     }
 
@@ -194,6 +233,8 @@ public class BookingService {
 	for (int i = 0; i < tage.getNumOfNextClicks(); i++) {
 	    nextDayButton.click();
 	}
+
+	new Actions(driver).scrollByAmount(0, 100).perform();
     }
 
     private void openBookingModal(WebDriver driver) {
@@ -253,7 +294,7 @@ public class BookingService {
     }
 
     private void scheduleClick(WebElement buchen, Uhrzeit uhrzeit, long offsetMillis, long chatId, WebDriver driver,
-	    boolean isHeute, String KontoName) {
+	    boolean isHeute, String kontoName) {
 	long delay = 0;
 
 	if (!isHeute) {
@@ -270,24 +311,24 @@ public class BookingService {
 	ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 	scheduler.schedule(() -> {
 	    String alertMsg = "";
-	    if (Strings.isNotEmpty(KontoName)) {
-		alertMsg = KontoName + ": ";
+	    if (Strings.isNotEmpty(kontoName)) {
+		alertMsg = kontoName + ": ";
 	    }
 	    try {
 		buchen.click();
-		if (Strings.isNotEmpty(KontoName)) {
-		    String clickInfo = KontoName + ": \"Buchen\" button clicked!";
+		if (Strings.isNotEmpty(kontoName)) {
+		    String clickInfo = kontoName + ": \"Buchen\" button clicked!";
 		    log.info(clickInfo);
 		    BuchungTelegramBot.addMessageToQueue(chatId, clickInfo);
 		}
-		
+
 		// Wait until alert text gets updated
 		try {
 		    Thread.sleep(2 * 1000);
 		} catch (InterruptedException e) {
 		    e.printStackTrace();
 		}
-		
+
 		// Collecting all alert messages and add them to the telegram message queue.
 		List<String> alertElements = new ArrayList<String>();
 		alertElements.add(
@@ -295,9 +336,16 @@ public class BookingService {
 		alertElements.add(
 			"/html/body/div[4]/div[3]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/p");
 		alertElements.add(
-			"/html/body/div[4]/div[3]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
+			"/html/body/div[4]/div[4]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/p");
 		alertElements.add(
 			"/html/body/div[4]/div[2]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
+		alertElements.add(
+			"/html/body/div[4]/div[3]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
+		alertElements.add(
+			"/html/body/div[4]/div[4]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
+		// Buchung erstellt
+		alertElements.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/p");
+		alertElements.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/ul/li");
 		for (String alertXPath : alertElements) {
 		    try {
 			WebElement pElement = driver.findElement(By.xpath(alertXPath));
@@ -312,7 +360,7 @@ public class BookingService {
 		}
 	    } catch (Exception e) {
 		log.error("Failed to click 'Buchen'", e);
-		alertMsg += "Failed to click 'Buchen'";
+		alertMsg += kontoName + ": Failed to click 'Buchen'";
 		BuchungTelegramBot.addMessageToQueue(chatId, alertMsg);
 	    }
 	    // close web driver
@@ -321,7 +369,7 @@ public class BookingService {
 	    } catch (InterruptedException e) {
 		e.printStackTrace();
 	    }
-	    driver.close();
+	    // driver.close();
 	}, delay, TimeUnit.MILLISECONDS);
     }
 }
