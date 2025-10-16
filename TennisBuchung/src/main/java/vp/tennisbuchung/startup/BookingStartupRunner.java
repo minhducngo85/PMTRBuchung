@@ -9,7 +9,6 @@ import vp.tennisbuchung.dtos.Konto;
 import vp.tennisbuchung.enums.Halle;
 import vp.tennisbuchung.enums.Uhrzeit;
 import vp.tennisbuchung.services.BookingService;
-import vp.tennisbuchung.telegram.BuchungTelegramBotInittializer;
 
 import static vp.tennisbuchung.enums.Dauer.ZWEI_STUNDE;
 import static vp.tennisbuchung.enums.Tage.*;

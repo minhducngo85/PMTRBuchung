@@ -13,7 +13,6 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import vp.tennisbuchung.TennisBuchungApplication;
 import vp.tennisbuchung.dtos.Konto;
 import vp.tennisbuchung.services.BookingService;
 
