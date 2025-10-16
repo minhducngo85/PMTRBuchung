@@ -192,7 +192,7 @@ public class BookingService {
 	    processBuchung(driver, tage, uhrzeit, platz, dauer, chatId, konto.lastname());
 
 	    Thread.sleep(10000);
-	  
+
 	} catch (Exception e) {
 	    log.error("An error occurs while processing tennis buchen", e);
 	} finally {
@@ -324,7 +324,7 @@ public class BookingService {
 	    try {
 		buchen.click();
 		if (Strings.isNotEmpty(kontoName)) {
-		    String clickInfo = kontoName + ": \"Buchen\" button clicked!";
+		    String clickInfo = kontoName + ": \"Buchen\" button clicked! Evaluating the booking status...";
 		    log.info(clickInfo);
 		    BuchungTelegramBot.addMessageToQueue(chatId, clickInfo);
 		}
@@ -337,6 +337,7 @@ public class BookingService {
 		}
 
 		// Collecting all alert messages and add them to the telegram message queue.
+		// Notifcation caption
 		List<String> alertElementGroup1 = new ArrayList<String>();
 		alertElementGroup1.add(
 			"/html/body/div[4]/div[2]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/p");
@@ -345,6 +346,7 @@ public class BookingService {
 		alertElementGroup1.add(
 			"/html/body/div[4]/div[4]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/p");
 
+		// Notification description
 		List<String> alertElementGroup2 = new ArrayList<String>();
 		alertElementGroup2.add(
 			"/html/body/div[4]/div[2]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
@@ -353,7 +355,7 @@ public class BookingService {
 		alertElementGroup2.add(
 			"/html/body/div[4]/div[4]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
 
-		// Buchung erstellt
+		// Buchung erfolgreich erstellt
 		List<String> successfulElementGroup = new ArrayList<String>();
 		successfulElementGroup.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/p");
 		successfulElementGroup.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/ul/li");
@@ -378,7 +380,7 @@ public class BookingService {
 		    }
 		}
 
-		// go over alert group 2
+		// go over successfulElementGroup
 		for (String alertXPath : successfulElementGroup) {
 		    try {
 			WebElement pElement = driver.findElement(By.xpath(alertXPath));
@@ -388,6 +390,7 @@ public class BookingService {
 			log.error("Element not found: " + alertXPath);
 		    }
 		}
+		
 		if (!alertMsg.isEmpty()) {
 		    log.info(alertMsg);
 		    BuchungTelegramBot.addMessageToQueue(chatId, alertMsg);
@@ -403,7 +406,7 @@ public class BookingService {
 	    } catch (InterruptedException e) {
 		e.printStackTrace();
 	    }
-	    driver.close();
+	    // driver.close();
 	}, delay, TimeUnit.MILLISECONDS);
     }
 }
