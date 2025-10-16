@@ -8,10 +8,12 @@ public class TelegramMessage {
 	super();
 	this.chatId = chatId;
 	this.message = message;
+	
     }
 
     private Long chatId;
     private String message;
+    private String additionalInfo;
 
     /**
      * @return the chatId
@@ -56,6 +58,20 @@ public class TelegramMessage {
 	    return false;
 	TelegramMessage other = (TelegramMessage) obj;
 	return (chatId.longValue() == other.chatId.longValue()) && Objects.equals(message, other.message);
+    }
+
+    /**
+     * @return the additionalInfo
+     */
+    public String getAdditionalInfo() {
+	return additionalInfo;
+    }
+
+    /**
+     * @param additionalInfo the additionalInfo to set
+     */
+    public void setAdditionalInfo(String additionalInfo) {
+	this.additionalInfo = additionalInfo;
     }
 
 }

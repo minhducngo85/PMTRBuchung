@@ -207,10 +207,14 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
      * @param chatId
      * @param filePath
      */
-    public void sendPhoto(Long chatId, String filePath) {
+    public void sendPhoto(Long chatId, String filePath, String caption) {
 	log.info("sendPhoto for filePath: " + filePath);
+	if (StringUtils.isEmpty(caption)) {
+	    caption = "Photo";
+	}
 	try {
-	    execute(SendPhoto.builder().chatId(chatId).photo(new InputFile(new java.io.File(filePath))).build());
+	    execute(SendPhoto.builder().chatId(chatId).photo(new InputFile(new java.io.File(filePath))).caption(caption)
+		    .build());
 	    File fileToDelete = FileUtils.getFile(filePath);
 	    FileUtils.deleteQuietly(fileToDelete);
 	} catch (TelegramApiException e) {
@@ -227,8 +231,7 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		TelegramMessage msg = it.next();
 		if (!StringUtils.isEmpty(msg.getMessage()) && msg.getMessage().startsWith("image:")) {
 		    String filePath = msg.getMessage().substring(6, msg.getMessage().length());
-
-		    sendPhoto(msg.getChatId(), filePath);
+		    sendPhoto(msg.getChatId(), filePath, msg.getAdditionalInfo());
 		} else {
 		    sendMessage(msg.getChatId(), msg.getMessage());
 		}
@@ -239,6 +242,12 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 
     public static synchronized void addMessageToQueue(Long chatId, String messageToSend) {
 	TelegramMessage message = new TelegramMessage(chatId, messageToSend);
+	if (!alrts.contains(message)) {
+	    alrts.add(message);
+	}
+    }
+
+    public static synchronized void addMessageToQueue(Long chatId, TelegramMessage message) {
 	if (!alrts.contains(message)) {
 	    alrts.add(message);
 	}

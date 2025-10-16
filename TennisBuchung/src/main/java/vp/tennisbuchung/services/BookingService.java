@@ -18,6 +18,7 @@ import vp.tennisbuchung.enums.Halle;
 import vp.tennisbuchung.enums.Tage;
 import vp.tennisbuchung.enums.Uhrzeit;
 import vp.tennisbuchung.telegram.BuchungTelegramBot;
+import vp.tennisbuchung.telegram.TelegramMessage;
 
 import java.io.File;
 import java.time.*;
@@ -144,18 +145,24 @@ public class BookingService {
 	    Thread.sleep(1000);
 
 	    selectDay(driver, tage);
+	    new Actions(driver).scrollByAmount(0, 100).perform();
 	    Thread.sleep(1000);
 
 	    String fileName = "Screenshot_" + System.currentTimeMillis() + ".png";
 	    fileName = "C:/tmp/telegrambot/" + fileName;
 	    File src = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
 	    FileUtils.copyFile(src, new File(fileName));
-	    BuchungTelegramBot.addMessageToQueue(chatId, "image:" + fileName);
+
+	    TelegramMessage message = new TelegramMessage(chatId, "image:" + fileName);
+	    message.setAdditionalInfo(halle.getName() + " " + tage.getName());
+	    BuchungTelegramBot.addMessageToQueue(chatId, message);
 	    Thread.sleep(10000);
+
 	} catch (Exception e) {
 	    log.error("An error occurs while fetching status", e);
 	} finally {
 	    log.info("Fetching status done!");
+	    driver.close();
 	}
     }
 
@@ -185,12 +192,14 @@ public class BookingService {
 	    processBuchung(driver, tage, uhrzeit, platz, dauer, chatId, konto.lastname());
 
 	    Thread.sleep(10000);
+	  
 	} catch (Exception e) {
 	    log.error("An error occurs while processing tennis buchen", e);
 	} finally {
 	    log.info("Buchen prepared successfully. Please check all opened windows to see results");
-	    driver.close();
+
 	}
+
     }
 
     private void login(WebDriver driver, Konto konto) {
@@ -233,8 +242,6 @@ public class BookingService {
 	for (int i = 0; i < tage.getNumOfNextClicks(); i++) {
 	    nextDayButton.click();
 	}
-
-	new Actions(driver).scrollByAmount(0, 100).perform();
     }
 
     private void openBookingModal(WebDriver driver) {
@@ -330,26 +337,53 @@ public class BookingService {
 		}
 
 		// Collecting all alert messages and add them to the telegram message queue.
-		List<String> alertElements = new ArrayList<String>();
-		alertElements.add(
+		List<String> alertElementGroup1 = new ArrayList<String>();
+		alertElementGroup1.add(
 			"/html/body/div[4]/div[2]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/p");
-		alertElements.add(
+		alertElementGroup1.add(
 			"/html/body/div[4]/div[3]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/p");
-		alertElements.add(
+		alertElementGroup1.add(
 			"/html/body/div[4]/div[4]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/p");
-		alertElements.add(
+
+		List<String> alertElementGroup2 = new ArrayList<String>();
+		alertElementGroup2.add(
 			"/html/body/div[4]/div[2]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
-		alertElements.add(
+		alertElementGroup2.add(
 			"/html/body/div[4]/div[3]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
-		alertElements.add(
+		alertElementGroup2.add(
 			"/html/body/div[4]/div[4]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
+
 		// Buchung erstellt
-		alertElements.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/p");
-		alertElements.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/ul/li");
-		for (String alertXPath : alertElements) {
+		List<String> successfulElementGroup = new ArrayList<String>();
+		successfulElementGroup.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/p");
+		successfulElementGroup.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/ul/li");
+		// go over alert group 1
+		for (String alertXPath : alertElementGroup1) {
 		    try {
 			WebElement pElement = driver.findElement(By.xpath(alertXPath));
 			alertMsg += pElement.getText() + "\n";
+			break;
+		    } catch (NoSuchElementException e) {
+			log.error("Element not found: " + alertXPath);
+		    }
+		}
+		// go over alert group 2
+		for (String alertXPath : alertElementGroup2) {
+		    try {
+			WebElement pElement = driver.findElement(By.xpath(alertXPath));
+			alertMsg += pElement.getText() + "\n";
+			break;
+		    } catch (NoSuchElementException e) {
+			log.error("Element not found: " + alertXPath);
+		    }
+		}
+
+		// go over alert group 2
+		for (String alertXPath : successfulElementGroup) {
+		    try {
+			WebElement pElement = driver.findElement(By.xpath(alertXPath));
+			alertMsg += pElement.getText() + "\n";
+			break;
 		    } catch (NoSuchElementException e) {
 			log.error("Element not found: " + alertXPath);
 		    }
@@ -365,11 +399,11 @@ public class BookingService {
 	    }
 	    // close web driver
 	    try {
-		Thread.sleep(2 * 1000);
+		Thread.sleep(20 * 1000);
 	    } catch (InterruptedException e) {
 		e.printStackTrace();
 	    }
-	    // driver.close();
+	    driver.close();
 	}, delay, TimeUnit.MILLISECONDS);
     }
 }
