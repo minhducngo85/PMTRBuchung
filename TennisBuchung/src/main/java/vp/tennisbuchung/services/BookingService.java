@@ -390,7 +390,7 @@ public class BookingService {
 			log.error("Element not found: " + alertXPath);
 		    }
 		}
-		
+
 		if (!alertMsg.isEmpty()) {
 		    log.info(alertMsg);
 		    BuchungTelegramBot.addMessageToQueue(chatId, alertMsg);
@@ -406,7 +406,7 @@ public class BookingService {
 	    } catch (InterruptedException e) {
 		e.printStackTrace();
 	    }
-	    // driver.close();
+	    driver.close();
 	}, delay, TimeUnit.MILLISECONDS);
     }
 }
