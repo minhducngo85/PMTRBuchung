@@ -59,9 +59,9 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-	Konto konto1 = new Konto("Ngo", "Duisburg6789",1);
-	Konto konto2 = new Konto("Pham", "Duisburg6789",2);
-	Konto konto3 = new Konto("nguyen", "0000",3);
+	Konto konto1 = new Konto("Ngo", "Duisburg6789", 1);
+	Konto konto2 = new Konto("Pham", "Duisburg6789", 2);
+	Konto konto3 = new Konto("nguyen", "0000", 3);
 	if (update.hasMessage()) {
 	    Message incomeMessage = update.getMessage();
 	    Long chatId = incomeMessage.getChatId();
@@ -129,8 +129,9 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 			sendMessage(chatId, msg);
 		    }
 		} else if (text.equalsIgnoreCase("/restart")) {
-		    //String msg = "Application is being restarted! All pending jobs are now canceled";
-		    //sendMessage(chatId, msg);
+		    // String msg = "Application is being restarted! All pending jobs are now
+		    // canceled";
+		    // sendMessage(chatId, msg);
 		    sendMessage(chatId, "Not supported command!");
 		} else if (text.startsWith("/help")) {
 		    String msg = "1. to book a tennis court\n/book [Konto] [Datum] [UhrZeit] [Platz] [Halle]\n\n";
@@ -143,7 +144,7 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    msg += "e.g. \n/book Ngo Heute 21:00 1\n";
 		    msg += "/book Ngo Heute 21:00 1 M";
 		    msg += "\n\n2. to cancel and deleted all pending bookings.\n /cancelBooking\n";
-		    //msg += "\n\n3.to retsart application.\n /restart\n";
+		    // msg += "\n\n3.to retsart application.\n /restart\n";
 
 		    sendMessage(chatId, msg);
 		}

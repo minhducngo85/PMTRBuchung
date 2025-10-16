@@ -43,8 +43,12 @@ public class BookingService {
 	LocalDateTime now = LocalDateTime.now();
 	LocalDate bookingDate = tage.getBookingDate();
 	LocalDateTime bookingDateTime = bookingDate.atTime(bookingTime.getHour(), bookingTime.getMinute());
-	// Preaparation time for each account should be different. Otherwise it makes chrome driver broken if multiple user oen web browser at the same time
-	LocalDateTime triggerTime = bookingDateTime.minusDays(1).minusMinutes(konto.preparationBeforeMinute()); // begin before 1-3 min.
+	// Preaparation time for each account should be different. Otherwise it makes
+	// chrome driver broken if multiple user oen web browser at the same time
+	LocalDateTime triggerTime = bookingDateTime.minusDays(1).minusMinutes(konto.preparationBeforeMinute()); // begin
+														// before
+														// 1-3
+														// min.
 
 	if (triggerTime.isAfter(bookingDateTime)) {
 	    log.warn("Too late to begin booking");

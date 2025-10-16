@@ -20,14 +20,15 @@ public class BookingStartupRunner {
 
     private final BookingService bookingService;
 
-    
     @PostConstruct
     public void initBooking() {
-    	log.info("Booking system starting...");
-        //Konto kontoVonDuc = new Konto("Ngo", "Duisburg6789");
-        //bookingService.scheduleBookingTrigger(HEUTE, Uhrzeit.NEUN, Halle.DUISBURG, 1, ZWEI_STUNDE, kontoVonDuc);
-        
-        //Konto kontoVonViet = new Konto("nguyen", "0000");
-        //bookingService.scheduleBookingTrigger(MORGEN, Uhrzeit.HALB_ZEHN, Halle.DUISBURG, 3, ZWEI_STUNDE, kontoVonViet);
+	log.info("Booking system starting...");
+	// Konto kontoVonDuc = new Konto("Ngo", "Duisburg6789");
+	// bookingService.scheduleBookingTrigger(HEUTE, Uhrzeit.NEUN, Halle.DUISBURG, 1,
+	// ZWEI_STUNDE, kontoVonDuc);
+
+	// Konto kontoVonViet = new Konto("nguyen", "0000");
+	// bookingService.scheduleBookingTrigger(MORGEN, Uhrzeit.HALB_ZEHN,
+	// Halle.DUISBURG, 3, ZWEI_STUNDE, kontoVonViet);
     }
 }
