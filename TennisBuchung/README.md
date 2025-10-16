@@ -15,5 +15,5 @@
 - create a application.properties (template: application_template.properties)
 - update bot.name and bot.token in application.properties
 - BuchungTelegramBot.java
- /** Ou have to update the list of allowed chat ids*/
+ /** You have to update the list of allowed chat ids*/
  private static List<Long> CHAT_IDs = new ArrayList<Long>();

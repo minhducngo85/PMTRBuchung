@@ -52,14 +52,13 @@ public class BookingService {
 
 	long delay = Duration.between(now, triggerTime).toMillis();
 
-	String tiltle = konto.lastname() + "_" + tage.getName() + "_" + bookingTime.getStringValue();
 	Runnable earlyTask = () -> {
-	    Thread.currentThread().setName("BookingThread-Early " + tiltle);
+	    Thread.currentThread().setName("BookingThread-Early");
 	    openChromeAndBook(tage, bookingTime, halle, platz, dauer, konto, chatId);
 	};
 
 	Runnable exactTask = () -> {
-	    Thread.currentThread().setName("BookingThread-Exact " + tiltle);
+	    Thread.currentThread().setName("BookingThread-Exact");
 	    openChromeAndBook(tage, bookingTime, halle, platz, dauer, konto, chatId);
 	};
 	String ret = "";
