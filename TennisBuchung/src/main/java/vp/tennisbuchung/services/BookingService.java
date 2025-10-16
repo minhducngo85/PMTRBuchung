@@ -1,0 +1,314 @@
+package vp.tennisbuchung.services;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.openqa.selenium.*;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import vp.tennisbuchung.dtos.Konto;
+import vp.tennisbuchung.enums.Dauer;
+import vp.tennisbuchung.enums.Halle;
+import vp.tennisbuchung.enums.Tage;
+import vp.tennisbuchung.enums.Uhrzeit;
+import vp.tennisbuchung.telegram.BuchungTelegramBot;
+
+import java.time.*;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+
+import static vp.tennisbuchung.enums.Halle.DUISBURG;
+import static vp.tennisbuchung.enums.Halle.MUELHEIM;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class BookingService {
+
+    private final ScheduledExecutorService bookingScheduler;
+
+    private List<ScheduledFuture<?>> futures = new ArrayList<ScheduledFuture<?>>();
+    /**
+     * Mở 2 Chrome riêng biệt: - Luồng Early click sớm 0,5s - Luồng Exact click đúng
+     * giờ
+     */
+    public String scheduleBookingTrigger(Tage tage, Uhrzeit bookingTime, Halle halle, int platz, Dauer dauer,
+	    Konto konto, Long chatId) {
+	log.warn("scheduleBookingTrigger ...........");
+	LocalDateTime now = LocalDateTime.now();
+	LocalDate bookingDate = tage.getBookingDate();
+	LocalDateTime bookingDateTime = bookingDate.atTime(bookingTime.getHour(), bookingTime.getMinute());
+	LocalDateTime triggerTime = bookingDateTime.minusDays(1).minusMinutes(3); // begin before 3 min.
+
+	if (triggerTime.isAfter(bookingDateTime)) {
+	    log.warn("Too late to begin booking");
+	    return "";
+	}
+
+	long delay = Duration.between(now, triggerTime).toMillis();
+
+	String tiltle = konto.lastname() + "_" + tage.getName() + "_" + bookingTime.getStringValue();
+	Runnable earlyTask = () -> {
+	    Thread.currentThread().setName("BookingThread-Early " + tiltle);
+	    openChromeAndBook(tage, bookingTime, halle, platz, dauer, konto, chatId);
+	};
+
+	Runnable exactTask = () -> {
+	    Thread.currentThread().setName("BookingThread-Exact " + tiltle);
+	    openChromeAndBook(tage, bookingTime, halle, platz, dauer, konto, chatId);
+	};
+	String ret = "";
+	if (delay <= 0) {
+	    new Thread(earlyTask).start();
+	    new Thread(exactTask).start();
+	    ret = "Booking is running...!";
+	} else {
+	    ScheduledFuture<?> earlyFuture = bookingScheduler.schedule(() -> new Thread(earlyTask).start(), delay, TimeUnit.MILLISECONDS);
+	    ScheduledFuture<?> exactFuture = bookingScheduler.schedule(() -> new Thread(exactTask).start(), delay, TimeUnit.MILLISECONDS);
+	    futures.add(earlyFuture);
+	    futures.add(exactFuture);
+	    ret = "Booking will be started in " + convertSecondsToString(delay/1000);
+	}
+	return ret;
+    }
+
+    // to cancel all pding bokking jobs
+    public String cancelBooking() {
+	for (ScheduledFuture<?> future : futures) {
+	    log.info("Before Cancel - Task is done : " + future.isDone());
+	    log.info("Before Cancel - Task is cancel : " + future.isCancelled());
+	    if (!future.isDone()) {
+		future.cancel(false);
+	    }
+	    log.info("After Cancel - Task is done : " + future.isDone());
+	    log.info("After Cancel - Task is cancel : " + future.isCancelled());
+	}
+	futures = new ArrayList<ScheduledFuture<?>>();
+	return "All scheduled bookings are now canceled";
+    }
+    
+    private String convertSecondsToString(long totalSecs) {
+	long hours = totalSecs / 3600;
+	long minutes = (totalSecs % 3600) / 60;
+	long seconds = totalSecs % 60;
+
+	String timeString = String.format("%02d:%02d:%02d", hours, minutes, seconds);
+	return timeString;
+    }
+
+    /**
+     * Mở Chrome riêng và book
+     */
+    private void openChromeAndBook(Tage tage, Uhrzeit uhrzeit, Halle halle, int platz, Dauer dauer, Konto konto,
+	    Long chatId) {
+	ChromeOptions options = new ChromeOptions();
+	options.addArguments("--start-maximized");
+	options.addArguments("--disable-notifications");
+	options.addArguments("--disable-infobars");
+	options.addArguments("--no-sandbox");
+	// Nếu muốn chạy headless, bỏ comment
+	// options.addArguments("--headless=new");
+	// tạo profile riêng cho mỗi luồng
+	options.addArguments("--user-data-dir=/tmp/chrome-profile-" + Thread.currentThread().getName() + "-"
+		+ System.currentTimeMillis());
+
+	WebDriver driver = new ChromeDriver(options);
+	driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10));
+	driver.manage().window().setSize(new Dimension(550, 900));
+
+	try {
+	    driver.get("https://app.tennis04.com/de/pmtr/login?returnUrl=%2Fde%2Fpmtr%2Fbuchungsplan");
+
+	    login(driver, konto);
+	    Thread.sleep(2000);
+
+	    selectHalle(driver, halle);
+	    Thread.sleep(1000);
+
+	    selectDay(driver, tage);
+	    Thread.sleep(1000);
+
+	    openBookingModal(driver);
+	    Thread.sleep(2000);
+
+	    processBuchung(driver, tage, uhrzeit, platz, dauer, chatId, konto.lastname());
+
+	    Thread.sleep(10000);
+	} catch (Exception e) {
+	    log.error("An error occurs while processing tennis buchen", e);
+	} finally {
+	    log.info("Buchen prepared successfully. Please check all opened windows to see results");
+	}
+    }
+
+    private void login(WebDriver driver, Konto konto) {
+	WebElement nameInput = driver.findElement(By.cssSelector("dx-text-box[formcontrolname='name'] input"));
+	((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", nameInput);
+	nameInput.sendKeys(konto.lastname());
+
+	WebElement passwordInput = driver.findElement(By.xpath("//dx-text-box[@formcontrolname='password']//input"));
+	((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", passwordInput);
+	passwordInput.sendKeys(konto.password());
+
+	WebElement loginButton = driver.findElement(By.xpath("//dx-button[@text='anmelden']"));
+	((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", loginButton);
+	loginButton.click();
+    }
+
+    private void selectHalle(WebDriver driver, Halle halle) {
+	WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(3));
+	WebElement halleTab = null;
+	if (halle == DUISBURG) {
+	    halleTab = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(
+		    "//div[@class='dx-item dx-tab' and .//dxi-item[normalize-space(text())='Duisburg_Tennishalle']]")));
+	    ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", halleTab);
+	    assert halleTab != null;
+	    halleTab.click();
+	} else if (halle == MUELHEIM) {
+	    // default = Muelheim -> nothign to do
+	    // halleTab = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(
+	    // "//div[@class='dx-item dx-tab' and
+	    // .//dxi-item[normalize-space(text())='Muelheim_Tennishalle']]")));
+	}
+
+    }
+
+    public void selectDay(WebDriver driver, Tage tage) {
+	WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(3));
+	WebElement nextDayButton = wait
+		.until(ExpectedConditions.elementToBeClickable(By.xpath("//dx-button[@icon='chevronnext']")));
+	((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", nextDayButton);
+	for (int i = 0; i < tage.getNumOfNextClicks(); i++) {
+	    nextDayButton.click();
+	}
+    }
+
+    private void openBookingModal(WebDriver driver) {
+	// Try to click on element until this is clickebale
+	List<WebElement> eventElements = driver
+		.findElements(By.xpath("//div[@class='fc-bgevent' and @id='eundefined']"));
+	for (WebElement element : eventElements) {
+	    try {
+		element.click();
+		return;
+	    } catch (Exception e) {
+		log.info("Try to click on the next item");
+	    }
+	}
+    }
+
+    private void processBuchung(WebDriver driver, Tage tage, Uhrzeit uhrzeit, Integer platz, Dauer dauer, Long chatId,
+	    String kontoName) throws InterruptedException {
+	WebElement button = driver.findElement(By.xpath("//dx-button[@name='fromNext' and @icon='chevronnext']"));
+	WebElement from = driver.findElement(By.xpath("//input[@type='hidden' and @name='from']"));
+
+	for (int i = 0; i < uhrzeit.getNumOfNextClicks(); i++) {
+	    button.click();
+	    Thread.sleep(500);
+	    // check if the value is equal to expected value
+	    String fromValue = from.getAttribute("value");
+	    if (fromValue.equalsIgnoreCase(uhrzeit.getStringValue())) {
+		break;
+	    }
+	}
+
+	WebElement button2 = driver.findElement(By.xpath("//dx-button[@name='durationNext' and @icon='chevronnext']"));
+	for (int i = 0; i < dauer.getValue(); i++) {
+	    button2.click();
+	    Thread.sleep(500);
+	}
+
+	WebElement dropdownButton = driver.findElement(By.className("dx-list-group-header-indicator"));
+	((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", dropdownButton);
+	dropdownButton.click();
+
+	List<WebElement> elements = driver
+		.findElements(By.xpath("//div[@class='dx-template-wrapper dx-item-content dx-list-item-content']"));
+	Thread.sleep(1000);
+	((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", elements.get(platz - 1));
+	elements.get(platz - 1).click();
+
+	WebElement buchen = driver.findElement(By.xpath("//dx-button//span[text()='Buchen']"));
+	((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", buchen);
+
+	long offsetMillis = Thread.currentThread().getName().contains("Early") ? 500 : 0; // bam dat truoc nua giay
+	if (tage.equals(Tage.HEUTE)) {
+	    scheduleClick(buchen, uhrzeit, offsetMillis, chatId, driver, true, kontoName);
+	} else {
+	    scheduleClick(buchen, uhrzeit, offsetMillis, chatId, driver, false, kontoName);
+	}
+    }
+
+    private void scheduleClick(WebElement buchen, Uhrzeit uhrzeit, long offsetMillis, long chatId, WebDriver driver,
+	    boolean isHeute, String KontoName) {
+	long delay = 0;
+
+	if (!isHeute) {
+	    LocalTime now = LocalTime.now();
+	    LocalTime targetTime = LocalTime.of(uhrzeit.getHour(), uhrzeit.getMinute(), 0);
+
+	    delay = now.until(targetTime, ChronoUnit.MILLIS) - offsetMillis;
+	    log.info("scheduleClick ... delay = " + delay / 1000 / 60 + " minutes");
+	    if (delay <= 0) {
+		delay = 0;
+	    }
+	}
+
+	ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+	scheduler.schedule(() -> {
+	    String alertMsg = "";
+	    if (KontoName != null && !KontoName.isBlank()) {
+		alertMsg = KontoName + ": ";
+	    }
+	    try {
+		buchen.click();
+		log.info("Buchen-button clicked!");
+		// Wait until alert text gets undated
+		try {
+		    Thread.sleep(2 * 1000);
+		} catch (InterruptedException e) {
+		    e.printStackTrace();
+		}
+		List<String> alertElements = new ArrayList<String>();
+		alertElements.add(
+			"/html/body/div[4]/div[2]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/p");
+		alertElements.add(
+			"/html/body/div[4]/div[3]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/p");
+		alertElements.add(
+			"/html/body/div[4]/div[3]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
+		alertElements.add(
+			"/html/body/div[4]/div[2]/div/t04-modal-wrapper/t04-create-booking/div[1]/t04-alertmessage/div/ul/li");
+
+		for (String alertXPath : alertElements) {
+		    try {
+			WebElement pElement = driver.findElement(By.xpath(alertXPath));
+			alertMsg += pElement.getText() + "\n";
+		    } catch (NoSuchElementException e) {
+			log.error("Element: " + alertXPath + " not found!");
+		    }
+		}
+
+		if (!alertMsg.isEmpty()) {
+		    log.info(alertMsg);
+		    BuchungTelegramBot.addMessageToQueue(chatId, alertMsg);
+		}
+	    } catch (Exception e) {
+		log.error("Failed to click 'Buchen'", e);
+		alertMsg += "Failed to click 'Buchen'";
+		BuchungTelegramBot.addMessageToQueue(chatId, alertMsg);
+	    }
+	    // close web driver
+	    try {
+		Thread.sleep(2 * 1000);
+	    } catch (InterruptedException e) {
+		e.printStackTrace();
+	    }
+	    driver.close();
+	}, delay, TimeUnit.MILLISECONDS);
+    }
+}
