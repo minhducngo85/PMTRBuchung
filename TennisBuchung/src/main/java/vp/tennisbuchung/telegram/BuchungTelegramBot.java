@@ -60,9 +60,9 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-	Konto konto1 = new Konto("Ngo", "Duisburg6789");
-	Konto konto2 = new Konto("Pham", "Duisburg6789");
-	Konto konto3 = new Konto("nguyen", "0000");
+	Konto konto1 = new Konto("Ngo", "Duisburg6789",1);
+	Konto konto2 = new Konto("Pham", "Duisburg6789",2);
+	Konto konto3 = new Konto("nguyen", "0000",3);
 	if (update.hasMessage()) {
 	    Message incomeMessage = update.getMessage();
 	    Long chatId = incomeMessage.getChatId();
@@ -143,7 +143,7 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    msg += "D=Duisburg(default);M=Mülheim\n";
 		    msg += "e.g. \n/book Ngo Heute 21:00 1\n";
 		    msg += "/book Ngo Heute 21:00 1 M";
-		    msg += "\n\n2.to cancel and deleted all sheduled bookings.\n /cancelBooking\n";
+		    msg += "\n\n2. to cancel and deleted all pending bookings.\n /cancelBooking\n";
 		    //msg += "\n\n3.to retsart application.\n /restart\n";
 
 		    sendMessage(chatId, msg);
@@ -184,7 +184,7 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 	}
     }
 
-    public static void addMessageToQueue(Long chatId, String messageToSend) {
+    public static synchronized void addMessageToQueue(Long chatId, String messageToSend) {
 	TelegramMessage message = new TelegramMessage(chatId, messageToSend);
 	if (!alrts.contains(message)) {
 	    alrts.add(message);

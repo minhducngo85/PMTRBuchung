@@ -55,7 +55,7 @@ public class TelegramMessage {
 	if (getClass() != obj.getClass())
 	    return false;
 	TelegramMessage other = (TelegramMessage) obj;
-	return Objects.equals(chatId, other.chatId) && Objects.equals(message, other.message);
+	return (chatId.longValue() == other.chatId.longValue()) && Objects.equals(message, other.message);
     }
 
 }

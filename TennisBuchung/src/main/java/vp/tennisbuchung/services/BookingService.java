@@ -33,6 +33,7 @@ public class BookingService {
     private final ScheduledExecutorService bookingScheduler;
 
     private List<ScheduledFuture<?>> futures = new ArrayList<ScheduledFuture<?>>();
+
     /**
      * Mở 2 Chrome riêng biệt: - Luồng Early click sớm 0,5s - Luồng Exact click đúng
      * giờ
@@ -43,7 +44,8 @@ public class BookingService {
 	LocalDateTime now = LocalDateTime.now();
 	LocalDate bookingDate = tage.getBookingDate();
 	LocalDateTime bookingDateTime = bookingDate.atTime(bookingTime.getHour(), bookingTime.getMinute());
-	LocalDateTime triggerTime = bookingDateTime.minusDays(1).minusMinutes(3); // begin before 3 min.
+	// Preaparation time for each account should be different. Otherwise it makes chrome driver broken if multiple user oen web browser at the same time
+	LocalDateTime triggerTime = bookingDateTime.minusDays(1).minusMinutes(konto.preparationBeforeMinute()); // begin before 1-3 min.
 
 	if (triggerTime.isAfter(bookingDateTime)) {
 	    log.warn("Too late to begin booking");
@@ -51,7 +53,6 @@ public class BookingService {
 	}
 
 	long delay = Duration.between(now, triggerTime).toMillis();
-
 	Runnable earlyTask = () -> {
 	    Thread.currentThread().setName("BookingThread-Early");
 	    openChromeAndBook(tage, bookingTime, halle, platz, dauer, konto, chatId);
@@ -67,11 +68,13 @@ public class BookingService {
 	    new Thread(exactTask).start();
 	    ret = "Booking is running...!";
 	} else {
-	    ScheduledFuture<?> earlyFuture = bookingScheduler.schedule(() -> new Thread(earlyTask).start(), delay, TimeUnit.MILLISECONDS);
-	    ScheduledFuture<?> exactFuture = bookingScheduler.schedule(() -> new Thread(exactTask).start(), delay, TimeUnit.MILLISECONDS);
+	    ScheduledFuture<?> earlyFuture = bookingScheduler.schedule(() -> new Thread(earlyTask).start(), delay,
+		    TimeUnit.MILLISECONDS);
+	    ScheduledFuture<?> exactFuture = bookingScheduler.schedule(() -> new Thread(exactTask).start(), delay,
+		    TimeUnit.MILLISECONDS);
 	    futures.add(earlyFuture);
 	    futures.add(exactFuture);
-	    ret = "Booking will be started in " + convertSecondsToString(delay/1000);
+	    ret = "Booking will be started in " + convertSecondsToString(delay / 1000);
 	}
 	return ret;
     }
@@ -90,7 +93,7 @@ public class BookingService {
 	futures = new ArrayList<ScheduledFuture<?>>();
 	return "All scheduled bookings are now canceled";
     }
-    
+
     private String convertSecondsToString(long totalSecs) {
 	long hours = totalSecs / 3600;
 	long minutes = (totalSecs % 3600) / 60;
@@ -105,6 +108,7 @@ public class BookingService {
      */
     private void openChromeAndBook(Tage tage, Uhrzeit uhrzeit, Halle halle, int platz, Dauer dauer, Konto konto,
 	    Long chatId) {
+	BuchungTelegramBot.addMessageToQueue(chatId, "Opening webbrowser for account: " + konto.lastname());
 	ChromeOptions options = new ChromeOptions();
 	options.addArguments("--start-maximized");
 	options.addArguments("--disable-notifications");
