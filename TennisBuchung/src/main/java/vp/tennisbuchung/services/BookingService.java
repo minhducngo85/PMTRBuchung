@@ -324,7 +324,7 @@ public class BookingService {
 	    try {
 		buchen.click();
 		if (Strings.isNotEmpty(kontoName)) {
-		    String clickInfo = kontoName + ": \"Buchen\" button clicked! Evaluating the booking status...";
+		    String clickInfo = kontoName + ": 'Buchen' clicked! Evaluating the result...";
 		    log.info(clickInfo);
 		    BuchungTelegramBot.addMessageToQueue(chatId, clickInfo);
 		}
@@ -357,7 +357,7 @@ public class BookingService {
 
 		// Buchung erfolgreich erstellt
 		List<String> successfulElementGroup = new ArrayList<String>();
-		successfulElementGroup.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/p");
+		// successfulElementGroup.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/p");
 		successfulElementGroup.add("/html/body/t04-modal/div[1]/div/t04-modalmessage/div/ul/li");
 		// go over alert group 1
 		for (String alertXPath : alertElementGroup1) {
@@ -385,7 +385,6 @@ public class BookingService {
 		    try {
 			WebElement pElement = driver.findElement(By.xpath(alertXPath));
 			alertMsg += pElement.getText() + "\n";
-			break;
 		    } catch (NoSuchElementException e) {
 			log.error("Element not found: " + alertXPath);
 		    }
