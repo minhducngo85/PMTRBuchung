@@ -1,0 +1,3 @@
+nohup java -jar TennisBuchung-0.0.1.jar &
+netstat -tulpn
+kill -15 pcoessid

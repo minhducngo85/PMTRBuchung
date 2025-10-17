@@ -1,0 +1,22 @@
+Deployment on Render
+https://www.youtube.com/watch?v=JZQfKwkltLE
+
+1. Create an Docker image
+docker build -t java-application .
+
+2. docker run (linux) - optional
+docker run -p8001:8090 -d java-application
+
+3. Tag: docker tag [app-name]:latest [docker-account-name]/java-application
+docker tag java-application:latest vampir301285/java-application
+
+4. push
+dock push vampir301285/java-application
+
+5. to check push result
+hub.docker.com
+
+6. open render
+render.com -> dashboard -> new "web service"
+-> existing image: docker.io/vampir301285/java-application:latest
+-> connect

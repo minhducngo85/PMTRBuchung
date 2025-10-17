@@ -119,7 +119,7 @@ public class BookingService {
 	options.addArguments("--disable-infobars");
 	options.addArguments("--no-sandbox");
 	// Nếu muốn chạy headless, bỏ comment
-	// options.addArguments("--headless=new");
+	options.addArguments("--headless=new");
 	// tạo profile riêng cho mỗi luồng
 	options.addArguments("--user-data-dir=/tmp/chrome-profile-" + Thread.currentThread().getName() + "-"
 		+ System.currentTimeMillis());
@@ -149,9 +149,11 @@ public class BookingService {
 	    Thread.sleep(1000);
 
 	    String fileName = "Screenshot_" + System.currentTimeMillis() + ".png";
-	    fileName = "C:/tmp/telegrambot/" + fileName;
+	    String folder = System.getProperty("user.home");
+	    fileName = folder + "/" + fileName;
 	    File src = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
 	    FileUtils.copyFile(src, new File(fileName));
+	    BuchungTelegramBot.addMessageToQueue(chatId, "Save screenshot to file: " + fileName);
 
 	    TelegramMessage message = new TelegramMessage(chatId, "image:" + fileName);
 	    message.setAdditionalInfo(halle.getName() + " " + tage.getName());
