@@ -183,7 +183,6 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    }
 		    String msg = "Betriebsystem: " + osName + "\nBetriebsystem-Version: " + osVersion
 			    + "\nBetriebsystem-Architektur: " + osArch + "\nServer-IP: " + ip + "\n";
-
 		    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 		    LocalDateTime now = LocalDateTime.now();
 		    String formattedDateTime = now.format(formatter); // "1986-04-08 12:30"
@@ -208,7 +207,7 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    msg += "\n\n3. to get booking status of a mall.\n /getStatus [Datum] [Halle:optional]\n";
 		    msg += "[Datum]: Heute|Morgen\n";
 		    msg += "[Halle]: D(default)|M\n";
-		    msg += "\n\n7. Get information like server info, the addresses of tennis malls.\n /info\n";
+		    msg += "\n4. Get information like server info, the addresses.\n /info\n";
 		    sendMessage(chatId, msg);
 		}
 	    }
