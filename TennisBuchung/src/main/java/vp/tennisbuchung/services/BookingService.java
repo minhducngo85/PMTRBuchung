@@ -156,10 +156,9 @@ public class BookingService {
 	    fileName = folder + "/" + fileName;
 	    File src = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
 	    FileUtils.copyFile(src, new File(fileName));
-	    BuchungTelegramBot.addMessageToQueue(chatId, "Save screenshot to file: " + fileName);
 
 	    TelegramMessage message = new TelegramMessage(chatId, "image:" + fileName);
-	    message.setAdditionalInfo(halle.getName() + " " + tage.getName());
+	    message.setAdditionalInfo(halle.getName().split("_")[0] + " " + tage.getName());
 	    BuchungTelegramBot.addMessageToQueue(chatId, message);
 	    Thread.sleep(10000);
 

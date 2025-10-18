@@ -133,21 +133,19 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 			|| text.toLowerCase().startsWith("/getstatus")) {
 		    Tage tage = HEUTE;
 		    Halle halle = Halle.DUISBURG;
-		    if (!text.strip().toLowerCase().equalsIgnoreCase("/getstatus")
-			    && text.strip().toLowerCase().equalsIgnoreCase("/getbookingstatus")) {
-			String[] splited = text.split(" ");
-			if (splited.length < 2) {
-			    sendMessage(chatId, "Invalid command");
-			    return;
-			}
+		    String[] splited = text.split(" ");
+		    if (splited.length > 1) {
 			String heuteOrMorgen = splited[1];
+			log.info("Morgen: " + heuteOrMorgen);
 			if (heuteOrMorgen.equalsIgnoreCase("Morgen")) {
 			    tage = Tage.MORGEN;
 			}
 
 			if (splited.length > 2) {
 			    String halleString = splited[2];
-			    if (halleString.equalsIgnoreCase("M"))
+			    log.info("Halle: " + halleString);
+			    if (halleString.equalsIgnoreCase("M") || halleString.equalsIgnoreCase("Muelheim")
+				    || halleString.equalsIgnoreCase("Mülheim"))
 				halle = Halle.MUELHEIM;
 			}
 		    }
