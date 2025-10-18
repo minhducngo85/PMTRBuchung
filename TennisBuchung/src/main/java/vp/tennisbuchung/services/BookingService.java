@@ -119,7 +119,10 @@ public class BookingService {
 	options.addArguments("--disable-infobars");
 	options.addArguments("--no-sandbox");
 	// Nếu muốn chạy headless, bỏ comment
-	options.addArguments("--headless=new");
+	if (System.getProperty("os.name").toLowerCase().startsWith("linux")) {
+	    // Head less for Linux
+	    options.addArguments("--headless=new");
+	}
 	// tạo profile riêng cho mỗi luồng
 	options.addArguments("--user-data-dir=/tmp/chrome-profile-" + Thread.currentThread().getName() + "-"
 		+ System.currentTimeMillis());
@@ -164,7 +167,7 @@ public class BookingService {
 	    log.error("An error occurs while fetching status", e);
 	} finally {
 	    log.info("Fetching status done!");
-	    driver.close();
+	    driver.quit();
 	}
     }
 
@@ -407,7 +410,7 @@ public class BookingService {
 	    } catch (InterruptedException e) {
 		e.printStackTrace();
 	    }
-	    driver.close();
+	    driver.quit();
 	}, delay, TimeUnit.MILLISECONDS);
     }
 }

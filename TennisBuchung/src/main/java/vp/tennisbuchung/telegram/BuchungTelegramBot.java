@@ -28,6 +28,10 @@ import static vp.tennisbuchung.enums.Dauer.ZWEI_STUNDE;
 import static vp.tennisbuchung.enums.Tage.*;
 
 import java.io.File;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -127,23 +131,27 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 
 		} else if (text.toLowerCase().startsWith("/getbookingstatus")
 			|| text.toLowerCase().startsWith("/getstatus")) {
-		    String[] splited = text.split(" ");
 		    Tage tage = HEUTE;
 		    Halle halle = Halle.DUISBURG;
-		    if (splited.length < 2) {
-			sendMessage(chatId, "Invalid command");
-			return;
-		    }
-		    String heuteOrMorgen = splited[1];
-		    if (heuteOrMorgen.equalsIgnoreCase("Morgen")) {
-			tage = Tage.MORGEN;
+		    if (!text.strip().toLowerCase().equalsIgnoreCase("/getstatus")
+			    && text.strip().toLowerCase().equalsIgnoreCase("/getbookingstatus")) {
+			String[] splited = text.split(" ");
+			if (splited.length < 2) {
+			    sendMessage(chatId, "Invalid command");
+			    return;
+			}
+			String heuteOrMorgen = splited[1];
+			if (heuteOrMorgen.equalsIgnoreCase("Morgen")) {
+			    tage = Tage.MORGEN;
+			}
+
+			if (splited.length > 2) {
+			    String halleString = splited[2];
+			    if (halleString.equalsIgnoreCase("M"))
+				halle = Halle.MUELHEIM;
+			}
 		    }
 
-		    if (splited.length > 2) {
-			String halleString = splited[2];
-			if (halleString.equalsIgnoreCase("M"))
-			    halle = Halle.MUELHEIM;
-		    }
 		    String msg = "Fetching booking status";
 		    msg += "\nDatum: " + tage.getName();
 		    msg += "\nHalle: " + halle.getName();
@@ -162,6 +170,31 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    // canceled";
 		    // sendMessage(chatId, msg);
 		    sendMessage(chatId, "Not supported command!");
+
+		} else if (text.equalsIgnoreCase("/info")) {
+		    String osName = System.getProperty("os.name");
+		    String osVersion = System.getProperty("os.version");
+		    String osArch = System.getProperty("os.arch");
+		    String ip = "";
+		    try {
+			ip = InetAddress.getLocalHost().getHostAddress();
+		    } catch (UnknownHostException e) {
+			e.printStackTrace();
+		    }
+		    String msg = "Betriebsystem: " + osName + "\nBetriebsystem-Version: " + osVersion
+			    + "\nBetriebsystem-Architektur: " + osArch + "\nServer-IP: " + ip + "\n";
+
+		    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+		    LocalDateTime now = LocalDateTime.now();
+		    String formattedDateTime = now.format(formatter); // "1986-04-08 12:30"
+		    msg += "Application time: " + formattedDateTime;
+		    sendMessage(chatId, msg);
+		    msg = "PMTR Duisburg Wedau: \n";
+		    msg += "Margaretenstraße 27, 47055 Duisburg";
+		    sendMessage(chatId, msg);
+		    msg = "PMTR Mülheim: \n";
+		    msg += "Mintarder Strasse 21, 45481 Mülheim an der Ruhr";
+		    sendMessage(chatId, msg);
 		} else if (text.startsWith("/help")) {
 		    String msg = "1. to book a tennis court\n/book [Konto] [Datum] [UhrZeit] [Platz] [Halle]\n";
 		    msg += "[Konto]: Ngo|Pham|Nguyen\n";
@@ -175,10 +208,12 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    msg += "\n\n3. to get booking status of a mall.\n /getStatus [Datum] [Halle:optional]\n";
 		    msg += "[Datum]: Heute|Morgen\n";
 		    msg += "[Halle]: D(default)|M\n";
+		    msg += "\n\n7. Get information like server info, the addresses of tennis malls.\n /info\n";
 		    sendMessage(chatId, msg);
 		}
 	    }
 	}
+
     }
 
     @Override

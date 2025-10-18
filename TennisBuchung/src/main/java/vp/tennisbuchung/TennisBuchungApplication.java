@@ -1,5 +1,7 @@
 package vp.tennisbuchung;
 
+import java.util.TimeZone;
+
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -13,6 +15,7 @@ public class TennisBuchungApplication {
     private static ConfigurableApplicationContext context;
     
     public static void main(String[] args) {
+	TimeZone.setDefault(TimeZone.getTimeZone("Europe/Berlin"));
         context = SpringApplication.run(TennisBuchungApplication.class, args);
     }
 

@@ -1,4 +1,7 @@
 copy logback.xml to root working directory
 nohup java -jar TennisBuchung-0.0.1.jar &
 netstat -tulpn
-kill -15 pcoessid
+kill -9 processid
+
+to check memory usage
+htop 
