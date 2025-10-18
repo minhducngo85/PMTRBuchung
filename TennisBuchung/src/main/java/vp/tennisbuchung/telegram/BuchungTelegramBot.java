@@ -14,6 +14,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +49,9 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
     @Value("${bot.token}")
     private String botToken;
 
+    @Value("${pmtr.accounts}")
+    private String loginAccounts;
+
     private final BookingService bookingService;
 
     private static List<TelegramMessage> alrts = new ArrayList<TelegramMessage>();
@@ -55,25 +59,73 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
     private static List<Long> CHAT_IDs = new ArrayList<Long>();
     static {
 	CHAT_IDs.add(-4882082400L); // Buchung PMTR
-	CHAT_IDs.add(1685262085L); // My chat with bot
+	CHAT_IDs.add(1685262085L); // private chat with productive
+	CHAT_IDs.add(1685262085L); // private chat with dev
 
     }
 
+    List<Konto> pmtrAccounts = new ArrayList<Konto>();
+
+    /**
+     * to chekc if a chat id is a valid one
+     * 
+     * @param chatId
+     * @return
+     */
     private boolean isValidChatId(Long chatId) {
 	if (CHAT_IDs.contains(chatId)) {
 	    return true;
 	}
-	return false;
+	return true;
     }
 
+    /**
+     * to initialize the data
+     */
+    @PostConstruct
+    public void init() {
+	log.info("Init pmtr login accounts");
+	String[] loginCredentials = loginAccounts.split(";");
+	int preparationBeforeMinute = 1;
+	for (String loginCredential : loginCredentials) {
+	    int indexOfColon = loginCredential.indexOf(':');
+	    String userName = loginCredential.substring(0, indexOfColon);
+	    String password = loginCredential.substring(indexOfColon + 1, loginCredential.length());
+	    log.info(userName + ":" + password + ":" + preparationBeforeMinute);
+	    pmtrAccounts.add(new Konto(userName, password, preparationBeforeMinute));
+	    preparationBeforeMinute++;
+	}
+    }
+
+    private Konto getLoginAccountByName(String lastname) {
+	if (StringUtils.isEmpty(lastname)) {
+	    return pmtrAccounts.get(0);
+	}
+	for (Konto aKonto : pmtrAccounts) {
+	    if (lastname.equalsIgnoreCase(aKonto.lastname())) {
+		return aKonto;
+	    }
+	}
+	return pmtrAccounts.get(0);
+    }
+
+    private String getAllKontoNames() {
+	String ret = "";
+	for (Konto aKonto : pmtrAccounts) {
+	    ret += aKonto.lastname() + ", ";
+	}
+	return ret.substring(0, ret.length() - 2);
+    }
+
+    /**
+     * listener for the telegram messages
+     */
     @Override
     public void onUpdateReceived(Update update) {
-	Konto konto1 = new Konto("Ngo", "Duisburg6789", 1);
-	Konto konto2 = new Konto("Pham", "Duisburg6789", 2);
-	Konto konto3 = new Konto("nguyen", "0000", 3);
 	if (update.hasMessage()) {
 	    Message incomeMessage = update.getMessage();
 	    Long chatId = incomeMessage.getChatId();
+	    log.info("chatId: " + chatId);
 	    if (!isValidChatId(chatId)) {
 		sendMessage(chatId, "Invalid chat id");
 		return;
@@ -90,9 +142,13 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    String heuteOrMorgen = splited[2];
 		    String uhrZeitStr = splited[3];
 
-		    Konto konto = konto1;
+		    Konto konto = getLoginAccountByName(kontoName);
 		    Tage tage = HEUTE;
 		    Uhrzeit uhrzeit = Uhrzeit.getUhrZeit(uhrZeitStr);
+		    if (uhrzeit == null) {
+			 sendMessage(chatId, uhrZeitStr + " is an invalid booking time!");
+			 return;
+		    }
 		    int platzNumber = 1;
 		    String platz = splited[4];
 		    try {
@@ -100,11 +156,7 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    } catch (NumberFormatException e) {
 		    }
 
-		    if (kontoName.equalsIgnoreCase("Pham")) {
-			konto = konto2;
-		    } else if (kontoName.equalsIgnoreCase("Nguyen")) {
-			konto = konto3;
-		    }
+		  
 		    if (heuteOrMorgen.equalsIgnoreCase("Morgen")) {
 			tage = Tage.MORGEN;
 		    }
@@ -154,7 +206,7 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    msg += "\nDatum: " + tage.getName();
 		    msg += "\nHalle: " + halle.getName();
 		    sendMessage(chatId, msg);
-		    bookingService.openChromeAndGetStatus(tage, halle, konto1, chatId);
+		    bookingService.openChromeAndGetStatus(tage, halle, pmtrAccounts.get(0), chatId);
 		} else if (text.equalsIgnoreCase("/cancelBooking")) {
 		    String msg = "To delete all pending booking jobs";
 		    sendMessage(chatId, msg);
@@ -185,6 +237,8 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		    LocalDateTime now = LocalDateTime.now();
 		    String formattedDateTime = now.format(formatter); // "1986-04-08 12:30"
 		    msg += "Application time: " + formattedDateTime;
+		    msg += "\nAvaiable Login Accounts: " + getAllKontoNames();
+		    msg += "\nBot Name: " + botName;
 		    sendMessage(chatId, msg);
 		    msg = "PMTR Duisburg Wedau: \n";
 		    msg += "Margaretenstraße 27, 47055 Duisburg";
@@ -210,18 +264,14 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 		}
 	    }
 	}
-
     }
 
-    @Override
-    public String getBotUsername() {
-	return botName;
-    }
-
-    public String getBotToken() {
-	return botToken;
-    }
-
+    /**
+     * to send a text message
+     * 
+     * @param chatId
+     * @param messageToSend
+     */
     public void sendMessage(Long chatId, String messageToSend) {
 	SendMessage message = new SendMessage();
 	message.setChatId(chatId);
@@ -254,6 +304,9 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 	}
     }
 
+    /**
+     * to send messages form queue on every given time period
+     */
     @Scheduled(cron = "0/2 * * ? * *")
     public void sendMessageFromQueue() {
 	if (!alrts.isEmpty()) {
@@ -290,7 +343,10 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
 	super.onRegister();
 	log.info("On register!");
 	for (Long chatId : CHAT_IDs) {
-	    sendMessage(chatId, "Bot is started!");
+	    try {
+		sendMessage(chatId, "Bot is started!");
+	    } catch (Exception e) {
+	    }
 	}
     }
 
@@ -312,8 +368,19 @@ public class BuchungTelegramBot extends TelegramLongPollingBot {
     public void onDestroy() throws Exception {
 	log.info("destroying!");
 	for (Long chatId : CHAT_IDs) {
-	    sendMessage(chatId, "Bot is shut down! All pending jobs are canceled");
+	    try {
+		sendMessage(chatId, "Bot is shut down! All pending jobs are canceled");
+	    } catch (Exception e) {
+	    }
 	}
     }
 
+    @Override
+    public String getBotUsername() {
+	return botName;
+    }
+
+    public String getBotToken() {
+	return botToken;
+    }
 }

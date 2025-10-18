@@ -47,7 +47,7 @@ public enum Uhrzeit {
     public static Uhrzeit getUhrZeit(String name) {
 	String[] splited = name.split(":");
 	if (splited.length != 2) {
-	    return UHR_2000;
+	    return null;
 	}
 	try {
 	    int hour = Integer.valueOf(splited[0]);
@@ -60,7 +60,7 @@ public enum Uhrzeit {
 	    }
 	} catch (NumberFormatException e) {
 	}
-	return UHR_2000;
+	return null;
     }
 
 }
