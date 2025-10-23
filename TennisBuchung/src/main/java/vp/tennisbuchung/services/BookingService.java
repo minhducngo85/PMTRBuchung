@@ -296,7 +296,7 @@ public class BookingService {
 	WebElement buchen = driver.findElement(By.xpath("//dx-button//span[text()='Buchen']"));
 	((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", buchen);
 
-	long offsetMillis = Thread.currentThread().getName().contains("Early") ? 500 : 0; // bam dat truoc nua giay
+	long offsetMillis = Thread.currentThread().getName().contains("Early") ? 100 : 0; // bam dat truoc nua giay
 	if (tage.equals(Tage.HEUTE)) {
 	    scheduleClick(buchen, uhrzeit, offsetMillis, chatId, driver, true, kontoName);
 	} else {

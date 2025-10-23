@@ -1,6 +1,8 @@
 Deployment on Render
 https://www.youtube.com/watch?v=JZQfKwkltLE
 
+go to working folder:
+
 1. Create an Docker image
 docker build -t java-application .
 
